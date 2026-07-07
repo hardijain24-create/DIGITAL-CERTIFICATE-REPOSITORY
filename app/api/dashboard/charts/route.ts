@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db"
 import { Certificate } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
+import mongoose from "mongoose"
 
 /**
  * GET /api/dashboard/charts
@@ -25,12 +26,15 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Fetch certificates based on user role (exclude soft-deleted)
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for consistent querying
     let query: any = { isDeleted: false }
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
+    
     if (payload.role === "user") {
-      query.$or = [{ ownerId: payload.userId }, { ownerEmail: payload.email }]
+      query.$or = [{ ownerId: userObjectId }, { ownerEmail: payload.email }]
     } else if (payload.role === "institution") {
       query.$or = [
-        { uploadedBy: payload.userId },
+        { uploadedBy: userObjectId },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }

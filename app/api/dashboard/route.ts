@@ -45,18 +45,19 @@ export async function GET(request: NextRequest) {
     console.log("[v0] Dashboard Query - User:", payload.userId, payload.email, payload.role)
 
     // 2. Build query based on user role (exclude soft-deleted)
+    // CRITICAL FIX: Use consistent ObjectId conversion via mongoose import
     let query: any = { isDeleted: false }
+    const mongoose = require("mongoose")
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
+    
     if (payload.role === "user") {
-      // Convert string userId to ObjectId for comparison
-      const ObjectId = require("mongoose").Types.ObjectId
       query.$or = [
-        { ownerId: new ObjectId(payload.userId) },
+        { ownerId: userObjectId },
         { ownerEmail: payload.email }
       ]
     } else if (payload.role === "institution") {
-      const ObjectId = require("mongoose").Types.ObjectId
       query.$or = [
-        { uploadedBy: new ObjectId(payload.userId) },
+        { uploadedBy: userObjectId },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }

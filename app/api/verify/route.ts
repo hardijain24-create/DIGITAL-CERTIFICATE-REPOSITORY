@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log("[v0] Verify Endpoint - Received:", { certificateId, hashLength: hash?.length })
+
     let cert = null
     let status: "verified" | "pending" | "revoked" | "expired" | "tampered" | "not_found" = "not_found"
     let description = ""
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
     // 2. Lookup & verify matching criteria
     if (hash) {
       // Try to find certificate by its hash
+      console.log("[v0] Verify - Searching by hash:", hash)
       cert = await Certificate.findOne({ hash, isDeleted: false })
+      console.log("[v0] Verify - Hash search result:", cert ? "FOUND" : "NOT_FOUND")
 
       if (cert) {
         // If a Certificate ID was also provided, it must match
@@ -105,7 +109,9 @@ export async function POST(request: NextRequest) {
       }
     } else if (certificateId) {
       // Find solely by Certificate ID
+      console.log("[v0] Verify - Searching by certificateId:", certificateId)
       cert = await Certificate.findOne({ certificateId, isDeleted: false })
+      console.log("[v0] Verify - ID search result:", cert ? "FOUND" : "NOT_FOUND")
 
       if (cert) {
         const isExpired = cert.expiryDate && new Date(cert.expiryDate) < new Date()
