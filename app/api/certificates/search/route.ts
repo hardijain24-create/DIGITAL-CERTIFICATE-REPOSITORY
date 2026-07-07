@@ -53,13 +53,15 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // 3. Build base query (exclude soft-deleted, apply authorization)
+    // CANONICAL QUERY: All roles use uploadedBy field as single source of truth
     let query: any = { isDeleted: false }
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
 
     if (payload.role === "user") {
-      query.$or = [{ ownerId: payload.userId }, { ownerEmail: payload.email }]
+      query.uploadedBy = userObjectId
     } else if (payload.role === "institution") {
       query.$or = [
-        { uploadedBy: payload.userId },
+        { uploadedBy: userObjectId },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }

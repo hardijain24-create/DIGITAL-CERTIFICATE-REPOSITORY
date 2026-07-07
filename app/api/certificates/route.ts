@@ -55,19 +55,17 @@ export async function GET(request: NextRequest) {
     console.log("[v0] GET Certificates - User:", payload.userId, payload.email, payload.role)
 
     // 3. Formulate query object based on user permissions
+    // CANONICAL QUERY: All roles use uploadedBy field as single source of truth
     let query: any = { isDeleted: false } // Exclude soft-deleted certificates
-    const ObjectId = mongoose.Types.ObjectId
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
 
     if (payload.role === "user") {
-      // User can only view their own certificates
-      query.$or = [
-        { ownerId: new ObjectId(payload.userId) },
-        { ownerEmail: payload.email }
-      ]
+      // User can only view their own certificates (by uploadedBy field)
+      query.uploadedBy = userObjectId
     } else if (payload.role === "institution") {
       // Institution can view certificates they uploaded or where they are the issuer
       query.$or = [
-        { uploadedBy: new ObjectId(payload.userId) },
+        { uploadedBy: userObjectId },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }
