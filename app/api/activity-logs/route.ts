@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db"
 import { ActivityLog } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
+import mongoose from "mongoose"
 
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_jwt_key_dcrs_2026_premium_saas_generation"
 
@@ -31,9 +32,10 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get("offset") || "0", 10)
 
     // 3. Admin users can view all audit logs, other roles can only see their own logs
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId
     let query: any = {}
     if (payload.role !== "admin") {
-      query.userId = payload.userId
+      query.userId = new mongoose.Types.ObjectId(payload.userId)
     }
 
     if (action) {

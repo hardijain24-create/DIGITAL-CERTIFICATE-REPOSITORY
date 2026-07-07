@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db"
 import { ActivityLog, VerificationLog } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
+import mongoose from "mongoose"
 
 /**
  * GET /api/audit-logs
@@ -65,7 +66,8 @@ export async function GET(request: NextRequest) {
     if (type === "activity" || type === "all") {
       const activityQuery: any = { timestamp: hasDateFilter ? dateFilter : {} }
       if (payload.role !== "admin") {
-        activityQuery.userId = payload.userId
+        // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId
+        activityQuery.userId = new mongoose.Types.ObjectId(payload.userId)
       }
 
       activityCount = await ActivityLog.countDocuments(activityQuery)

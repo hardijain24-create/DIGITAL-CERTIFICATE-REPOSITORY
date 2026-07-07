@@ -6,6 +6,7 @@ import { getJWTSecret } from "@/lib/env"
 import { generateRandomToken } from "@/lib/utils"
 import type { ApiResponse, Share } from "@/lib/types"
 import crypto from "crypto"
+import mongoose from "mongoose"
 
 /**
  * POST /api/certificates/share
@@ -46,7 +47,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Verify certificate exists and user owns it
-    const certificate = await Certificate.findById(certificateId)
+    // CRITICAL FIX: certificateId is STRING custom ID, not MongoDB ObjectId
+    // Query by custom certificateId field, not _id
+    const certificate = await Certificate.findOne({ certificateId, isDeleted: false })
     if (!certificate) {
       return NextResponse.json(
         { success: false, message: "Certificate not found" },
@@ -54,8 +57,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check ownership
-    if (certificate.uploadedBy !== payload.userId && certificate.ownerEmail !== payload.email) {
+    // Check ownership - compare ObjectId to ObjectId
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
+    const hasAccess = 
+      certificate.uploadedBy.toString() === userObjectId.toString() ||
+      certificate.ownerEmail === payload.email
+
+    if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Forbidden: You do not own this certificate" },
         { status: 403 }
@@ -77,9 +85,10 @@ export async function POST(request: NextRequest) {
     const shareLink = `${origin}/shared/${shareToken}`
 
     // 6. Create share log entry
+    // CRITICAL FIX: Store userObjectId as ObjectId, not string
     const shareLog = await ShareLog.create({
       certificateId: certificate._id,
-      sharedBy: payload.userId,
+      sharedBy: userObjectId,
       sharedByEmail: payload.email,
       sharedWith: sharedWith || null,
       permission,
@@ -93,8 +102,9 @@ export async function POST(request: NextRequest) {
     })
 
     // 7. Log activity
+    // CRITICAL FIX: Store userObjectId as ObjectId
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: userObjectId,
       action: "certificate_shared",
       description: `Shared certificate ${certificate.certificateName} with ${sharedWith || "public"}`,
       certificateId: certificate._id,
