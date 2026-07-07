@@ -6,6 +6,7 @@ import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
 import { v2 as cloudinary } from "cloudinary"
 import crypto from "crypto"
+import mongoose from "mongoose"
 
 // Configure Cloudinary
 cloudinary.config({
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Formulate query object based on user permissions
     let query: any = { isDeleted: false } // Exclude soft-deleted certificates
-    const ObjectId = require("mongoose").Types.ObjectId
+    const ObjectId = mongoose.Types.ObjectId
 
     if (payload.role === "user") {
       // User can only view their own certificates
@@ -71,6 +72,8 @@ export async function GET(request: NextRequest) {
       ]
     }
     // Admin sees everything except soft-deleted (query has isDeleted: false)
+    
+    console.log("[v0] Certificate Query:", JSON.stringify(query, null, 2))
 
     // 4. Apply advanced filters
     if (category && category !== "all") {
@@ -110,6 +113,8 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .skip(skip)
       .exec()
+    
+    console.log("[v0] Query Results:", { totalCount, returned: list.length, firstDoc: list[0]?.ownerId })
 
     const totalPages = Math.ceil(totalCount / limit)
 
@@ -262,10 +267,11 @@ export async function POST(request: NextRequest) {
     const qrCode = generateQRCodeURL(qrData)
 
     // 10. Save metadata in MongoDB Atlas
+    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
     const newCertificate = await Certificate.create({
       certificateId,
       certificateName,
-      ownerId: payload.userId, // Default owner is uploader for "user" role
+      ownerId: userObjectId, // Convert userId string to ObjectId for consistent querying
       ownerName,
       ownerEmail,
       issuer,
@@ -281,7 +287,7 @@ export async function POST(request: NextRequest) {
       qrCode,
       hash: fileHash,
       verificationStatus: "verified", // Uploaded directly by owner or issuer -> verified
-      uploadedBy: payload.userId,
+      uploadedBy: userObjectId, // Ensure uploadedBy is also ObjectId for consistency
       isShared: false,
       sharedWith: [],
       isDeleted: false,
