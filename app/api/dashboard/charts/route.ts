@@ -25,77 +25,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    // 2. Fetch certificates based on user role (exclude soft-deleted)
-    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for consistent querying
-    let query: any = { isDeleted: false }
+    // 2. Build base match query - USE uploadedBy as source of truth
     const userObjectId = new mongoose.Types.ObjectId(payload.userId)
-    
-    if (payload.role === "user") {
-      query.$or = [{ ownerId: userObjectId }, { ownerEmail: payload.email }]
-    } else if (payload.role === "institution") {
-      query.$or = [
-        { uploadedBy: userObjectId },
-        { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
-      ]
-    }
-    // Admin role fetches all certificates
-
-    const certificates = await Certificate.find(query)
-
-    // 3. Aggregate categories data
-    const categoriesCount: Record<string, number> = {
-      academic: 0,
-      professional: 0,
-      internship: 0,
-      training: 0,
-      government: 0,
-      identity: 0,
-      license: 0,
-      achievement: 0,
-      workshop: 0,
-      other: 0,
+    let matchQuery: any = { uploadedBy: userObjectId, isDeleted: false }
+    if (payload.role === "admin") {
+      matchQuery = { isDeleted: false }
     }
 
-    // 4. Aggregate monthly uploads data (past 6 months)
-    const monthlyUploads: Record<string, number> = {}
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    
-    // Initialize past 6 months with 0
-    const now = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthLabel = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().substring(2)}`
-      monthlyUploads[monthLabel] = 0
-    }
-
-    certificates.forEach((cert) => {
-      // Category count
-      if (categoriesCount[cert.category] !== undefined) {
-        categoriesCount[cert.category]++
-      } else {
-        categoriesCount[cert.category] = 1
+    // 3. Aggregate categories and monthly data using MongoDB pipeline
+    const chartsData = await Certificate.aggregate([
+      { $match: matchQuery },
+      {
+        $facet: {
+          categories: [
+            {
+              $group: {
+                _id: "$category",
+                count: { $sum: 1 }
+              }
+            },
+            { $sort: { count: -1 } }
+          ],
+          monthlyData: [
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$createdAt" },
+                  month: { $month: "$createdAt" }
+                },
+                count: { $sum: 1 }
+              }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } }
+          ]
+        }
       }
+    ])
 
-      // Monthly uploads
-      const certDate = new Date(cert.createdAt)
-      const monthLabel = `${monthNames[certDate.getMonth()]} ${certDate.getFullYear().toString().substring(2)}`
-      
-      // Only record if it matches one of our active 6 months
-      if (monthlyUploads[monthLabel] !== undefined) {
-        monthlyUploads[monthLabel]++
+    const chartResult = chartsData[0] || { categories: [], monthlyData: [] }
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    // Format monthly data for Recharts
+    const chartMonthlyData = chartResult.monthlyData.map((item: any) => {
+      const monthLabel = `${monthNames[item._id.month - 1]} ${item._id.year.toString().substring(2)}`
+      return {
+        month: monthLabel,
+        uploads: item.count
       }
     })
 
-    // Format monthly data for Recharts
-    const chartMonthlyData = Object.entries(monthlyUploads).map(([month, count]) => ({
-      month,
-      uploads: count,
-    }))
-
     // Format category data
-    const chartCategoryData = Object.entries(categoriesCount).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value,
+    const chartCategoryData = chartResult.categories.map((cat: any) => ({
+      name: (cat._id || "other").charAt(0).toUpperCase() + (cat._id || "other").slice(1),
+      value: cat.count
     }))
 
     return NextResponse.json({

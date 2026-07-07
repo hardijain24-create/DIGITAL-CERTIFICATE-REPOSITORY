@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db"
 import { ActivityLog } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
+import mongoose from "mongoose"
 
 /**
  * GET /api/dashboard/activity
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
 
     let query: any = {}
     if (payload.role !== "admin") {
-      query.userId = payload.userId
+      // Convert payload.userId (STRING) to ObjectId for consistency
+      query.userId = new mongoose.Types.ObjectId(payload.userId)
     }
 
     // Extract pagination parameters

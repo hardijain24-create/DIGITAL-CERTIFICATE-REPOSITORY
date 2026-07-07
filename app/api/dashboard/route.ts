@@ -44,92 +44,111 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Dashboard Query - User:", payload.userId, payload.email, payload.role)
 
-    // 2. Build query based on user role (exclude soft-deleted)
-    // CRITICAL FIX: Use consistent ObjectId conversion via mongoose import
-    let query: any = { isDeleted: false }
+    // 2. Build base match query - USE uploadedBy as source of truth
     const mongoose = require("mongoose")
     const userObjectId = new mongoose.Types.ObjectId(payload.userId)
     
-    if (payload.role === "user") {
-      query.$or = [
-        { ownerId: userObjectId },
-        { ownerEmail: payload.email }
-      ]
-    } else if (payload.role === "institution") {
-      query.$or = [
-        { uploadedBy: userObjectId },
-        { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
-      ]
-    }
-    // Admin role queries all non-deleted certificates
-
-    // 3. Fetch certificates
-    const certificates = await Certificate.find(query)
-    console.log("[v0] Dashboard Query Result - Found", certificates.length, "certificates")
-
-    // 4. Calculate metrics
-    const totalCertificates = certificates.length
-    let verifiedCertificates = 0
-    let pendingCertificates = 0
-    let expiredCertificates = 0
-    let sharedCertificates = 0
-    let totalDownloads = 0
-    let totalViews = 0
-    let totalBytes = 0
-
-    const now = new Date()
-    const certificatesByCategory: Record<string, number> = {
-      academic: 0,
-      professional: 0,
-      internship: 0,
-      training: 0,
-      government: 0,
-      identity: 0,
-      license: 0,
-      achievement: 0,
-      workshop: 0,
-      other: 0,
+    let matchQuery: any = { uploadedBy: userObjectId, isDeleted: false }
+    if (payload.role === "admin") {
+      matchQuery = { isDeleted: false }
     }
 
-    certificates.forEach((cert) => {
-      if (cert.verificationStatus === "verified") verifiedCertificates++
-      else if (cert.verificationStatus === "pending") pendingCertificates++
-
-      const isExpired = cert.expiryDate && new Date(cert.expiryDate) < now
-      if (isExpired || cert.verificationStatus === "expired") {
-        expiredCertificates++
+    // 3. Aggregate all metrics in a single pipeline for consistency
+    const aggregationPipeline = [
+      { $match: matchQuery },
+      {
+        $facet: {
+          totalStats: [
+            {
+              $group: {
+                _id: null,
+                totalCertificates: { $sum: 1 },
+                verifiedCertificates: {
+                  $sum: { $cond: [{ $eq: ["$verificationStatus", "verified"] }, 1, 0] }
+                },
+                pendingCertificates: {
+                  $sum: { $cond: [{ $eq: ["$verificationStatus", "pending"] }, 1, 0] }
+                },
+                expiredCertificates: {
+                  $sum: { $cond: [{ $eq: ["$verificationStatus", "expired"] }, 1, 0] }
+                },
+                sharedCertificates: {
+                  $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ["$sharedWith", []] } }, 0] }, 1, 0] }
+                },
+                totalDownloads: { $sum: { $ifNull: ["$downloads", 0] } },
+                totalViews: { $sum: { $ifNull: ["$views", 0] } },
+                totalBytes: { $sum: { $ifNull: ["$fileSize", 0] } }
+              }
+            }
+          ],
+          categories: [
+            {
+              $group: {
+                _id: "$category",
+                count: { $sum: 1 }
+              }
+            },
+            { $sort: { count: -1 } }
+          ],
+          recentUploads: [
+            { $sort: { createdAt: -1 } },
+            { $limit: 5 },
+            {
+              $project: {
+                _id: 1,
+                certificateId: 1,
+                certificateName: 1,
+                ownerName: 1,
+                issuer: 1,
+                category: 1,
+                fileSize: 1,
+                createdAt: 1,
+                updatedAt: 1
+              }
+            }
+          ]
+        }
       }
+    ]
 
-      if (cert.isShared || (cert.sharedWith && cert.sharedWith.length > 0)) {
-        sharedCertificates++
-      }
+    const results = await Certificate.aggregate(aggregationPipeline)
+    const facetResult = results[0] || {}
+    
+    const stats = facetResult.totalStats?.[0] || {
+      totalCertificates: 0,
+      verifiedCertificates: 0,
+      pendingCertificates: 0,
+      expiredCertificates: 0,
+      sharedCertificates: 0,
+      totalDownloads: 0,
+      totalViews: 0,
+      totalBytes: 0
+    }
 
-      totalDownloads += cert.downloads || 0
-      totalViews += cert.views || 0
-      totalBytes += cert.fileSize || 0
-
-      if (certificatesByCategory[cert.category] !== undefined) {
-        certificatesByCategory[cert.category]++
-      } else {
-        certificatesByCategory[cert.category] = 1
-      }
+    const certificatesByCategory: Record<string, number> = {}
+    facetResult.categories?.forEach((cat: any) => {
+      certificatesByCategory[cat._id || "other"] = cat.count
     })
 
-    // 5. Get total users (admin only)
+    const totalCertificates = stats.totalCertificates
+    const verifiedCertificates = stats.verifiedCertificates
+    const pendingCertificates = stats.pendingCertificates
+    const expiredCertificates = stats.expiredCertificates
+    const sharedCertificates = stats.sharedCertificates
+    const totalDownloads = stats.totalDownloads
+    const totalViews = stats.totalViews
+    const totalBytes = stats.totalBytes
+    const recentUploads = facetResult.recentUploads || []
+
+    // 4. Get total users (admin only)
     let totalUsers = 0
     if (payload.role === "admin") {
       totalUsers = await User.countDocuments()
     }
 
-    // 6. Get recent uploads (5 most recent)
-    const recentUploads = await Certificate.find(query)
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select("certificateId certificateName ownerId ownerName issuer category fileSize createdAt")
-
-    // 7. Get verification metrics
+    // 5. Get verification metrics based on aggregation results
     const verificationStats = await VerificationLog.aggregate([
-      { $match: { certificateId: { $in: certificates.map(c => c._id) } } },
+      { $match: { certificateId: { $in: recentUploads.map((c: any) => c._id) } } },
       { $group: { _id: "$status", count: { $sum: 1 } } }
     ])
 
@@ -140,8 +159,8 @@ export async function GET(request: NextRequest) {
       verificationSuccessRate = total > 0 ? Math.round((verified / total) * 100) : 0
     }
 
-    // 8. Build response
-    const stats: DashboardStats = {
+    // 6. Build response
+    const dashboardStats: DashboardStats = {
       totalCertificates,
       verifiedCertificates,
       pendingCertificates,
@@ -171,7 +190,7 @@ export async function GET(request: NextRequest) {
         success: true,
         message: "Dashboard stats retrieved successfully",
         data: {
-          ...stats,
+          ...dashboardStats,
           verificationSuccessRate,
           totalUsers: payload.role === "admin" ? totalUsers : undefined,
         },

@@ -26,88 +26,82 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    // 2. Query certificates based on user role (exclude soft-deleted)
-    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for MongoDB queries
-    let query: any = { isDeleted: false }
+    // 2. Build base match query - USE uploadedBy as source of truth
     const userObjectId = new mongoose.Types.ObjectId(payload.userId)
-    
-    if (payload.role === "user") {
-      query.$or = [{ ownerId: userObjectId }, { ownerEmail: payload.email }]
-    } else if (payload.role === "institution") {
-      query.$or = [
-        { uploadedBy: userObjectId },
-        { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
-      ]
+    let matchQuery: any = { uploadedBy: userObjectId, isDeleted: false }
+    if (payload.role === "admin") {
+      matchQuery = { isDeleted: false }
     }
-    // Admin role queries all non-deleted certificates
 
-    const certificates = await Certificate.find(query)
-
-    // 3. Compute metrics
-    const totalCertificates = certificates.length
-    let verifiedCertificates = 0
-    let pendingCertificates = 0
-    let expiredCertificates = 0
-    let sharedCertificates = 0
-    let totalDownloads = 0
-    let totalViews = 0
-    let totalBytes = 0
-
-    const now = new Date()
-
-    certificates.forEach((cert) => {
-      if (cert.verificationStatus === "verified") verifiedCertificates++
-      else if (cert.verificationStatus === "pending") pendingCertificates++
-
-      const isExpired = cert.expiryDate && new Date(cert.expiryDate) < now
-      if (isExpired || cert.verificationStatus === "expired") {
-        expiredCertificates++
+    // 3. Aggregate all metrics directly from MongoDB
+    const statsResult = await Certificate.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalCertificates: { $sum: 1 },
+          verifiedCertificates: {
+            $sum: { $cond: [{ $eq: ["$verificationStatus", "verified"] }, 1, 0] }
+          },
+          pendingCertificates: {
+            $sum: { $cond: [{ $eq: ["$verificationStatus", "pending"] }, 1, 0] }
+          },
+          expiredCertificates: {
+            $sum: { $cond: [{ $eq: ["$verificationStatus", "expired"] }, 1, 0] }
+          },
+          revokedCount: {
+            $sum: { $cond: [{ $eq: ["$verificationStatus", "revoked"] }, 1, 0] }
+          },
+          sharedCertificates: {
+            $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ["$sharedWith", []] } }, 0] }, 1, 0] }
+          },
+          totalDownloads: { $sum: { $ifNull: ["$downloads", 0] } },
+          totalViews: { $sum: { $ifNull: ["$views", 0] } },
+          totalBytes: { $sum: { $ifNull: ["$fileSize", 0] } }
+        }
       }
+    ])
 
-      if (cert.isShared || (cert.sharedWith && cert.sharedWith.length > 0)) {
-        sharedCertificates++
-      }
+    const certStats = statsResult[0] || {
+      totalCertificates: 0,
+      verifiedCertificates: 0,
+      pendingCertificates: 0,
+      expiredCertificates: 0,
+      revokedCount: 0,
+      sharedCertificates: 0,
+      totalDownloads: 0,
+      totalViews: 0,
+      totalBytes: 0
+    }
 
-      totalDownloads += cert.downloads || 0
-      totalViews += cert.views || 0
-      totalBytes += cert.fileSize || 0
-    })
+    const {
+      totalCertificates,
+      verifiedCertificates,
+      pendingCertificates,
+      expiredCertificates,
+      revokedCount,
+      sharedCertificates,
+      totalDownloads,
+      totalViews,
+      totalBytes
+    } = certStats
 
     // 4. Get category distribution
     const categoryDistribution = await Certificate.aggregate([
-      { $match: query },
+      { $match: matchQuery },
       { $group: { _id: "$category", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ])
 
-    // 5. Get verification metrics
-    const certIds = certificates.map(c => c._id)
-    const verificationStats = await VerificationLog.aggregate([
-      { $match: { certificateId: { $in: certIds } } },
-      { $group: { _id: "$status", count: { $sum: 1 } } }
-    ])
-
-    const verificationCounts = {
-      verified: 0,
-      pending: 0,
-      revoked: 0,
-      expired: 0,
-      tampered: 0,
-      not_found: 0
-    }
-    verificationStats.forEach(stat => {
-      if (stat._id in verificationCounts) {
-        verificationCounts[stat._id as keyof typeof verificationCounts] = stat.count
-      }
-    })
-
-    // 6. Get issuer distribution
+    // 5. Get issuer distribution
     const issuerDistribution = await Certificate.aggregate([
-      { $match: query },
+      { $match: matchQuery },
       { $group: { _id: "$issuer", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ])
+
+
 
     return NextResponse.json({
       success: true,
