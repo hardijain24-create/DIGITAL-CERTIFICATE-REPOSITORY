@@ -177,14 +177,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     // 2. Find certificate
+    console.log("[v0] DELETE - Searching for certificate:", id)
     const isObjectId = mongoose.isValidObjectId(id)
     const cert = await Certificate.findOne(
       isObjectId ? { $or: [{ _id: id }, { certificateId: id }] } : { certificateId: id }
     )
 
     if (!cert) {
+      console.log("[v0] DELETE - Certificate not found:", id)
       return NextResponse.json({ success: false, message: "Certificate not found" }, { status: 404 })
     }
+
+    console.log("[v0] DELETE - Certificate found:", cert.certificateId)
+    console.log("[v0] DELETE - User:", payload.userId, "Role:", payload.role)
+    console.log("[v0] DELETE - Certificate owner:", cert.ownerId.toString(), "Uploader:", cert.uploadedBy.toString())
 
     // 3. Authorization check
     // Admins can delete anything; Users/Institutions can delete certificates they own/uploaded
@@ -192,6 +198,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       payload.role === "admin" ||
       cert.ownerId.toString() === payload.userId ||
       cert.uploadedBy.toString() === payload.userId
+
+    console.log("[v0] DELETE - Authorization check:", canDelete)
 
     if (!canDelete) {
       return NextResponse.json({ success: false, message: "Forbidden: You are not authorized to delete this certificate" }, { status: 403 })

@@ -51,19 +51,22 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
 
+    console.log("[v0] GET Certificates - User:", payload.userId, payload.email, payload.role)
+
     // 3. Formulate query object based on user permissions
     let query: any = { isDeleted: false } // Exclude soft-deleted certificates
+    const ObjectId = require("mongoose").Types.ObjectId
 
     if (payload.role === "user") {
       // User can only view their own certificates
       query.$or = [
-        { ownerId: payload.userId },
+        { ownerId: new ObjectId(payload.userId) },
         { ownerEmail: payload.email }
       ]
     } else if (payload.role === "institution") {
       // Institution can view certificates they uploaded or where they are the issuer
       query.$or = [
-        { uploadedBy: payload.userId },
+        { uploadedBy: new ObjectId(payload.userId) },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }

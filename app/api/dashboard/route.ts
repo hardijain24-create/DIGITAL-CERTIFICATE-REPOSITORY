@@ -42,13 +42,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    console.log("[v0] Dashboard Query - User:", payload.userId, payload.email, payload.role)
+
     // 2. Build query based on user role (exclude soft-deleted)
     let query: any = { isDeleted: false }
     if (payload.role === "user") {
-      query.$or = [{ ownerId: payload.userId }, { ownerEmail: payload.email }]
-    } else if (payload.role === "institution") {
+      // Convert string userId to ObjectId for comparison
+      const ObjectId = require("mongoose").Types.ObjectId
       query.$or = [
-        { uploadedBy: payload.userId },
+        { ownerId: new ObjectId(payload.userId) },
+        { ownerEmail: payload.email }
+      ]
+    } else if (payload.role === "institution") {
+      const ObjectId = require("mongoose").Types.ObjectId
+      query.$or = [
+        { uploadedBy: new ObjectId(payload.userId) },
         { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
       ]
     }
@@ -56,6 +64,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Fetch certificates
     const certificates = await Certificate.find(query)
+    console.log("[v0] Dashboard Query Result - Found", certificates.length, "certificates")
 
     // 4. Calculate metrics
     const totalCertificates = certificates.length

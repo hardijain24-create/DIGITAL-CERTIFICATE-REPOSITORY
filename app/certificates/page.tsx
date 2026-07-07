@@ -129,10 +129,18 @@ export default function CertificatesPage() {
 
     try {
       setIsDeletingLoading(true)
-      const response = await fetch(`/api/certificates/${deletingCert.certificateId}`, {
+      console.log("[v0] Delete clicked for certificate:", deletingCert.certificateId)
+      
+      const url = `/api/certificates/${deletingCert.certificateId}`
+      console.log("[v0] DELETE request to:", url)
+      
+      const response = await fetch(url, {
         method: "DELETE"
       })
+      
+      console.log("[v0] DELETE response status:", response.status)
       const data = await response.json()
+      console.log("[v0] DELETE response:", data)
 
       if (response.ok && data.success) {
         toast.success(data.message || "Certificate deleted successfully.")
@@ -142,6 +150,7 @@ export default function CertificatesPage() {
         toast.error(data.message || "Failed to delete certificate.")
       }
     } catch (err) {
+      console.error("[v0] Delete error:", err)
       toast.error("Network error deleting certificate.")
     } finally {
       setIsDeletingLoading(false)
