@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db"
-import { User } from "@/lib/models"
+import { User, ActivityLog } from "@/lib/models"
 import { ProfileUpdateSchema, PasswordChangeSchema } from "@/lib/validations"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
@@ -125,6 +125,18 @@ export async function PATCH(request: NextRequest) {
     if (!updatedUser) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 })
     }
+
+    // 5. Log activity
+    const updates = []
+    if (validation.data.name) updates.push("name")
+    if (validation.data.email) updates.push("email")
+    if (validation.data.profilePicture) updates.push("profile picture")
+
+    await ActivityLog.create({
+      userId: payload.userId,
+      action: "profile_updated",
+      description: `User profile updated: ${updates.join(", ")}`,
+    })
 
     return NextResponse.json({
       success: true,
