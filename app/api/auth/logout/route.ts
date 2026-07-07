@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db"
 import { ActivityLog } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
+import { Types } from "mongoose"
 
 /**
  * POST /api/auth/logout
@@ -25,8 +26,9 @@ export async function POST(request: NextRequest) {
       const payload = await verifyJWT(token, JWT_SECRET)
       if (payload) {
         await connectDB()
+        // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
         await ActivityLog.create({
-          userId: payload.userId,
+          userId: new Types.ObjectId(payload.userId),
           action: "user_logout",
           description: `User logged out: ${payload.email}`,
         })

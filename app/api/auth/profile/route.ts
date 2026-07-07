@@ -5,6 +5,7 @@ import { ProfileUpdateSchema, PasswordChangeSchema } from "@/lib/validations"
 import { verifyJWT } from "@/lib/jwt"
 import { getJWTSecret } from "@/lib/env"
 import bcrypt from "bcryptjs"
+import { Types } from "mongoose"
 
 /**
  * GET /api/auth/profile
@@ -132,8 +133,9 @@ export async function PATCH(request: NextRequest) {
     if (validation.data.email) updates.push("email")
     if (validation.data.profilePicture) updates.push("profile picture")
 
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: new Types.ObjectId(payload.userId),
       action: "profile_updated",
       description: `User profile updated: ${updates.join(", ")}`,
     })

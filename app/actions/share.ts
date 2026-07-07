@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/db"
 import { Certificate, Share, ActivityLog } from "@/lib/models"
 import { verifyJWT } from "@/lib/jwt"
 import { cookies } from "next/headers"
-import mongoose from "mongoose"
+import mongoose, { Types } from "mongoose"
 
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_jwt_key_dcrs_2026_premium_saas_generation"
 
@@ -56,10 +56,11 @@ export async function shareCertificate(data: {
     }
 
     // 4. Create or update Share record
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await Share.findOneAndUpdate(
       { certificateId: cert._id, sharedWith: emailToShareWith },
       {
-        ownerId: payload.userId,
+        ownerId: new Types.ObjectId(payload.userId),
         permission: data.permission,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
       },
@@ -75,8 +76,9 @@ export async function shareCertificate(data: {
     await cert.save()
 
     // 6. Log activity
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: new Types.ObjectId(payload.userId),
       action: "certificate_shared",
       description: `Shared certificate "${cert.certificateName}" with ${emailToShareWith} (${data.permission})`,
       certificateId: cert._id,
@@ -146,8 +148,9 @@ export async function revokeCertificateShare(data: {
     await cert.save()
 
     // 5. Log activity
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: new Types.ObjectId(payload.userId),
       action: "certificate_shared", // Log as sharing modification activity
       description: `Revoked sharing access for certificate "${cert.certificateName}" from ${emailToRevoke}`,
       certificateId: cert._id,

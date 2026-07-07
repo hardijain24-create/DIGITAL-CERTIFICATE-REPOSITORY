@@ -218,8 +218,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     // 6. Log the audit activity
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: new Types.ObjectId(payload.userId),
       action: "certificate_deleted",
       description: `Deleted certificate "${cert.certificateName}" (Certificate ID: ${cert.certificateId})`,
       certificateId: cert._id,

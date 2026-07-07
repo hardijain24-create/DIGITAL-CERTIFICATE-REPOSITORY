@@ -294,8 +294,9 @@ export async function POST(request: NextRequest) {
     })
 
     // 11. Create system audit log
+    // CRITICAL FIX: Convert payload.userId (STRING) to ObjectId for storage
     await ActivityLog.create({
-      userId: payload.userId,
+      userId: userObjectId,
       action: "certificate_uploaded",
       description: `Uploaded certificate "${certificateName}" issued by "${issuer}"`,
       certificateId: newCertificate._id,
