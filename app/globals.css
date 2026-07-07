@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* DCRS Design System - Light Theme */
+  --background: #F7F9FC;
+  --foreground: #1A1E26;
+  
+  --card: rgba(255, 255, 255, 0.65);
+  --card-foreground: #1A1E26;
+  
+  --primary: #6C63FF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #8A7CFF;
+  --secondary-foreground: #FFFFFF;
+  --accent: #7DD3FC;
+  --accent-foreground: #0F172A;
+  
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --muted: #E2E8F0;
+  --muted-foreground: #64748B;
+  
+  --border: rgba(108, 99, 255, 0.08);
+  --input: #FFFFFF;
+  --ring: #6C63FF;
+  
+  --chart-1: #6C63FF;
+  --chart-2: #8A7CFF;
+  --chart-3: #7DD3FC;
+  --chart-4: #10B981;
+  --chart-5: #F59E0B;
+  
+  --radius: 1.25rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border/80 outline-ring/30;
+  }
+  html {
+    @apply bg-background scroll-smooth;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(108, 99, 255, 0.03) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(125, 211, 252, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(138, 124, 255, 0.03) 0px, transparent 50%);
+  }
+}
+
+/* Glassmorphism premium utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-premium {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(108, 99, 255, 0.08);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.01),
+    0 1px 3px rgba(108, 99, 255, 0.05);
+}
+
+/* Decorative background blobs */
+.floating-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  z-index: -1;
+  pointer-events: none;
+  animation: floatAround 20s infinite alternate ease-in-out;
+}
+
+@keyframes floatAround {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(40px, -60px) scale(1.1);
+  }
+  100% {
+    transform: translate(-30px, 50px) scale(0.95);
+  }
+}
+
+/* Shimmer Loading (Skeleton Animation) */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.5) 25%,
+    rgba(203, 213, 225, 0.6) 37%,
+    rgba(226, 232, 240, 0.5) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer-anim 1.4s ease infinite;
+}
+
+@keyframes shimmer-anim {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(108, 99, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 99, 255, 0.3);
+}
+
+/* Animated architecture connection lines */
+.line-draw {
+  stroke-dasharray: 10;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
