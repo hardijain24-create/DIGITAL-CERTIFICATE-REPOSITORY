@@ -133,13 +133,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Resolve verifying user details
-    const authCookie = request.cookies.get("authToken")?.value
+    let token = request.cookies.get("authToken")?.value
+    if (!token) {
+      const authHeader = request.headers.get("authorization")
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.slice(7)
+      }
+    }
+    
     let verifiedBy = undefined
     let verifiedByName = "Guest Auditor"
 
-    if (authCookie) {
+    if (token) {
       const JWT_SECRET = getJWTSecret()
-      const payload = await verifyJWT(authCookie, JWT_SECRET)
+      const payload = await verifyJWT(token, JWT_SECRET)
       if (payload) {
         verifiedBy = payload.userId
         verifiedByName = payload.email

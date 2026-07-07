@@ -10,7 +10,14 @@ import { getJWTSecret } from "@/lib/env"
  */
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("authToken")?.value
+    // Get token from cookie or Authorization header
+    let token = request.cookies.get("authToken")?.value
+    if (!token) {
+      const authHeader = request.headers.get("authorization")
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.slice(7)
+      }
+    }
     
     // Log logout if token exists and is valid
     if (token) {
