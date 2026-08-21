@@ -1,0 +1,42 @@
+# DCRS Cleanup Task List
+
+- [x] Component 1: Authentication & Session Management
+  - [x] Add `"user_logout"` to ActivityLog schemas in `lib/models.ts`
+  - [x] Update `app/api/auth/logout/route.ts` to use a nested try-catch to guarantee cookie clearing
+  - [x] Remove dummy fallbacks ("John Doe", "student@dcrs.io") from `components/DashboardLayout.tsx` and load dynamically
+- [x] Component 2: Profile Page & Password Management
+  - [x] Implement `changePassword` Server Action in `app/actions/profile.ts`
+  - [x] Update profile page `app/profile/page.tsx` with a fully functional change-password form
+- [x] Component 3: Dashboard & Search Route
+  - [x] Verify usages of `app/api/dashboard/route.ts` and delete if unused
+  - [x] Implement the actual MongoDB search logic in `app/api/certificates/search/route.ts`
+- [x] Component 4: Layout & Interactive Details
+  - [x] Implement Command Palette suggestion filtering, click behavior, and escape handler
+  - [x] Hide admin suggestions for non-admin users in Command Palette
+  - [x] Make notifications stateful and enable "Mark all read" to clear notifications
+  - [x] Verify mobile menu closures on navigation item click
+- [x] Component 5: Redundancy & Template Cleanup
+  - [x] Verify usages of template components (`ProductTeaserCard`, `PricingSection`, `BankingScaleHero`, `CaseStudiesCarousel`, `FAQSection`, `Footer`, `IntegrationCarousel`, `PortfolioNavbar`)
+  - [x] Delete template files if unused and associated assets
+  - [x] Delete duplicate hook/CSS files: `components/ui/use-mobile.tsx`, `components/ui/use-toast.ts`, `styles/globals.css`
+  - [x] Consolidate all root `.md` files into the `docs/` structure (keeping root `README.md`)
+- [x] Component 6: Dependency Cleanups
+  - [x] Clean up unused packages in `package.json`
+- [x] Component 7: Sweep & Validation Audit
+  - [x] Sweep repository for remaining TODO/FIXME/Coming soon placeholders
+  - [x] Audit all `<button>`, `<Button>`, `<Link>`, `<a>`, `onClick`, `href`, `preventDefault` elements
+  - [x] Run `npm run build`, `npm run lint`, and TypeScript verification
+- [x] Component 8: React Warning Unique 'key' Prop
+  - [x] Verify `/api/dashboard/activity` API response serialization structure
+  - [x] Fix unique key prop in `app/dashboard/page.tsx` from `act._id` to `act.id`
+  - [x] Fix unique key prop in `app/admin/page.tsx` from `item._id` to `item.id` for audit log mapping
+- [x] Component 9: Secure Document Upload Pipeline
+  - [x] Update Cloudinary API key in `.env.local` to the valid 15-digit credential
+  - [x] Apply process-wide DNS configuration in `next.config.mjs` to completely resolve MongoDB DNS timeouts in Next.js worker threads
+  - [x] Implement database-saving try-catch block in `/api/certificates` to clean up newly uploaded Cloudinary assets if MongoDB save fails
+  - [x] Make the dashboard statistics aggregation matching query consistent with role permissions (allowing user view aggregates to match their visible list)
+  - [x] Perform hard delete in `DELETE /api/certificates/[id]` so deleted documents immediately return 404 and are fully removed from MDB and Cloudinary
+- [x] Component 10: Next.js 16 Deprecations & Cache Cleaning
+  - [x] Clean obsolete configuration keys (`optimizeFonts` and `swcMinify`) in `next.config.mjs`
+  - [x] Retain `middleware.ts` to avoid Next.js routing compilation worker errors
+  - [x] Clear `.next` build cache directory to remove Turbopack dev caches

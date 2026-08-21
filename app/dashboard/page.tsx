@@ -72,15 +72,15 @@ export default function DashboardPage() {
         setIsLoading(true)
 
         // 1. Fetch Stats
-        const statsRes = await fetch("/api/dashboard/stats")
+        const statsRes = await fetch("/api/dashboard/stats", { cache: "no-store" })
         const statsData = await statsRes.json()
 
         // 2. Fetch Charts
-        const chartsRes = await fetch("/api/dashboard/charts")
+        const chartsRes = await fetch("/api/dashboard/charts", { cache: "no-store" })
         const chartsData = await chartsRes.json()
 
         // 3. Fetch Activity feed
-        const activityRes = await fetch("/api/dashboard/activity")
+        const activityRes = await fetch("/api/dashboard/activity", { cache: "no-store" })
         const activityData = await activityRes.json()
 
         if (statsData.success) setStats(statsData.data)
@@ -413,7 +413,7 @@ export default function DashboardPage() {
                   if (act.action === "certificate_deleted") badgeColor = "bg-danger/10 text-danger"
                   
                   return (
-                    <div key={act._id} className="flex gap-4 items-start pb-4 border-b border-border/40 last:border-0 hover:bg-white/10 p-1.5 rounded-xl transition-colors">
+                    <div key={act.id} className="flex gap-4 items-start pb-4 border-b border-border/40 last:border-0 hover:bg-white/10 p-1.5 rounded-xl transition-colors">
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${badgeColor} shrink-0`}>
                         {act.action.split("_")[1]?.substring(0, 2).toUpperCase() || "AC"}
                       </div>

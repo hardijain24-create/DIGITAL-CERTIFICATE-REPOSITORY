@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 
     // 8. Upload stream to Cloudinary
     console.log("[DCRS Storage] Uploading file to Cloudinary...")
-    const { uploadToCloudinary, CLOUDINARY_FOLDERS } = await import("@/lib/cloudinary")
+    const { uploadToCloudinary, CLOUDINARY_FOLDERS, deleteFromCloudinary } = await import("@/lib/cloudinary")
     const uploadRes = await uploadToCloudinary(
       buffer,
       file.name,
@@ -241,56 +241,67 @@ export async function POST(request: NextRequest) {
     )
     console.log("[DCRS Storage] Cloudinary upload successful.")
 
-    // 9. Generate metadata parameters with enhanced QR codes
-    const certificateId = `CERT_${Date.now()}_${crypto.randomBytes(4).toString("hex").toUpperCase()}`
-    
-    const { generateQRCodeData, generateQRCodeURL } = await import("@/lib/qrcode")
-    const origin = new URL(request.url).origin
-    const verificationUrl = `${origin}/verify?id=${certificateId}`
-    
-    const qrData = generateQRCodeData(
-      certificateId,
-      fileHash,
-      issuer,
-      ownerName,
-      new Date(),
-      verificationUrl
-    )
-    const qrCode = generateQRCodeURL(qrData)
+    let newCertificate
+    try {
+      // 9. Generate metadata parameters with enhanced QR codes
+      const certificateId = `CERT_${Date.now()}_${crypto.randomBytes(4).toString("hex").toUpperCase()}`
+      
+      const { generateQRCodeData, generateQRCodeURL } = await import("@/lib/qrcode")
+      const origin = new URL(request.url).origin
+      const verificationUrl = `${origin}/verify?id=${certificateId}`
+      
+      const qrData = generateQRCodeData(
+        certificateId,
+        fileHash,
+        issuer,
+        ownerName,
+        new Date(),
+        verificationUrl
+      )
+      const qrCode = generateQRCodeURL(qrData)
 
-    // 10. Save metadata in MongoDB Atlas
-    const newCertificate = await Certificate.create({
-      certificateId,
-      certificateName,
-      ownerId: payload.userId, // Default owner is uploader for "user" role
-      ownerName,
-      ownerEmail,
-      issuer,
-      issuerWebsite,
-      category,
-      description,
-      issueDate: issueDate ? new Date(issueDate) : undefined,
-      expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-      fileUrl: uploadRes.secure_url,
-      publicId: uploadRes.public_id,
-      fileType: file.type.startsWith("application/pdf") ? "pdf" : "image",
-      fileSize: file.size,
-      qrCode,
-      hash: fileHash,
-      verificationStatus: "verified", // Uploaded directly by owner or issuer -> verified
-      uploadedBy: payload.userId,
-      isShared: false,
-      sharedWith: [],
-      isDeleted: false,
-    })
+      // 10. Save metadata in MongoDB Atlas
+      newCertificate = await Certificate.create({
+        certificateId,
+        certificateName,
+        ownerId: payload.userId, // Default owner is uploader for "user" role
+        ownerName,
+        ownerEmail,
+        issuer,
+        issuerWebsite,
+        category,
+        description,
+        issueDate: issueDate ? new Date(issueDate) : undefined,
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+        fileUrl: uploadRes.secure_url,
+        publicId: uploadRes.public_id,
+        fileType: file.type.startsWith("application/pdf") ? "pdf" : "image",
+        fileSize: file.size,
+        qrCode,
+        hash: fileHash,
+        verificationStatus: "verified", // Uploaded directly by owner or issuer -> verified
+        uploadedBy: payload.userId,
+        isShared: false,
+        sharedWith: [],
+        isDeleted: false,
+      })
 
-    // 11. Create system audit log
-    await ActivityLog.create({
-      userId: payload.userId,
-      action: "certificate_uploaded",
-      description: `Uploaded certificate "${certificateName}" issued by "${issuer}"`,
-      certificateId: newCertificate._id,
-    })
+      // 11. Create system audit log
+      await ActivityLog.create({
+        userId: payload.userId,
+        action: "certificate_uploaded",
+        description: `Uploaded certificate "${certificateName}" issued by "${issuer}"`,
+        certificateId: newCertificate._id,
+      })
+    } catch (dbError) {
+      console.error("[DCRS Storage] MongoDB save failed. Deleting uploaded Cloudinary asset:", uploadRes.public_id)
+      try {
+        await deleteFromCloudinary(uploadRes.public_id)
+      } catch (cloudinaryDelError) {
+        console.error("[DCRS Storage] Failed to clean up Cloudinary asset:", cloudinaryDelError)
+      }
+      throw dbError
+    }
 
     return NextResponse.json(
       {

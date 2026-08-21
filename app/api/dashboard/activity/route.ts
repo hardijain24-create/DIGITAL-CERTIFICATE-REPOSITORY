@@ -51,28 +51,37 @@ export async function GET(request: NextRequest) {
       actionSummary[log.action] = (actionSummary[log.action] || 0) + 1
     })
 
-    return NextResponse.json({
-      success: true,
-      message: "Recent activity log feed retrieved successfully",
-      data: logs.map(log => ({
-        id: log._id.toString(),
-        action: log.action,
-        description: log.description,
-        user: log.userId,
-        certificate: log.certificateId,
-        timestamp: log.timestamp
-      })),
-      actionSummary,
-      pagination: {
-        currentPage: page,
-        pageSize: limit,
-        totalActivities: totalCount,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Recent activity log feed retrieved successfully",
+        data: logs.map(log => ({
+          id: log._id.toString(),
+          action: log.action,
+          description: log.description,
+          user: log.userId,
+          certificate: log.certificateId,
+          timestamp: log.timestamp
+        })),
+        actionSummary,
+        pagination: {
+          currentPage: page,
+          pageSize: limit,
+          totalActivities: totalCount,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        },
+        timestamp: new Date().toISOString()
       },
-      timestamp: new Date().toISOString()
-    })
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
+      }
+    )
   } catch (error) {
     console.error("[DCRS API] GET dashboard activity error:", error)
     return NextResponse.json(

@@ -94,15 +94,24 @@ export async function GET(request: NextRequest) {
       value,
     }))
 
-    return NextResponse.json({
-      success: true,
-      message: "Dashboard chart data successfully aggregated",
-      data: {
-        categories: chartCategoryData,
-        monthlyUploads: chartMonthlyData,
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Dashboard chart data successfully aggregated",
+        data: {
+          categories: chartCategoryData,
+          monthlyUploads: chartMonthlyData,
+        },
+        timestamp: new Date().toISOString()
       },
-      timestamp: new Date().toISOString()
-    })
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
+      }
+    )
   } catch (error) {
     console.error("[DCRS API] GET dashboard charts error:", error)
     return NextResponse.json(

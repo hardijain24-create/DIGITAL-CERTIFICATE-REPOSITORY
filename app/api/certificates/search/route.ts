@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { ApiResponse, Certificate } from "@/lib/types"
+import { connectDB } from "@/lib/db"
+import { Certificate as CertificateModel } from "@/lib/models"
+import { verifyJWT } from "@/lib/jwt"
+import { getJWTSecret } from "@/lib/env"
+import type { ApiResponse } from "@/lib/types"
 
 /**
  * GET /api/certificates/search?q=<query>
@@ -7,8 +11,11 @@ import type { ApiResponse, Certificate } from "@/lib/types"
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
+    await connectDB()
+
+    // 1. Authenticate user
+    const token = request.cookies.get("authToken")?.value || request.headers.get("authorization")?.split(" ")[1]
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
@@ -20,9 +27,23 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const JWT_SECRET = getJWTSecret()
+    const payload = await verifyJWT(token, JWT_SECRET)
+    if (!payload) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized",
+          error: "Invalid token",
+          timestamp: new Date().toISOString(),
+        } as ApiResponse,
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get("q")?.toLowerCase() || ""
-    const limit = parseInt(searchParams.get("limit") || "20", 10)
+    const query = searchParams.get("q") || ""
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)))
 
     if (!query || query.length < 2) {
       return NextResponse.json(
@@ -36,8 +57,45 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // TODO: Query MongoDB with text search
-    const results: Certificate[] = []
+    // 2. Build base query with access controls
+    let searchCriteria: any = { isDeleted: false }
+
+    if (payload.role === "user") {
+      searchCriteria.$or = [
+        { ownerId: payload.userId },
+        { ownerEmail: payload.email }
+      ]
+    } else if (payload.role === "institution") {
+      searchCriteria.$or = [
+        { uploadedBy: payload.userId },
+        { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
+      ]
+    }
+
+    // 3. Add search regex queries safely
+    const searchRegex = { $regex: query, $options: "i" }
+    const matchConditions = [
+      { certificateName: searchRegex },
+      { certificateId: searchRegex },
+      { issuer: searchRegex },
+      { ownerName: searchRegex }
+    ]
+
+    if (searchCriteria.$or) {
+      // Must satisfy permissions AND search conditions
+      searchCriteria = {
+        $and: [
+          { $or: searchCriteria.$or },
+          { $or: matchConditions }
+        ],
+        isDeleted: false
+      }
+    } else {
+      searchCriteria.$or = matchConditions
+    }
+
+    // 4. Query MongoDB
+    const results = await CertificateModel.find(searchCriteria).limit(limit).exec()
 
     return NextResponse.json(
       {
@@ -45,7 +103,7 @@ export async function GET(request: NextRequest) {
         message: `Found ${results.length} matching certificates`,
         data: results,
         timestamp: new Date().toISOString(),
-      } as ApiResponse<Certificate[]>,
+      },
       { status: 200 }
     )
   } catch (error) {

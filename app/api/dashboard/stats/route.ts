@@ -26,11 +26,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    // 2. Build base match query - USE uploadedBy as source of truth
-    const userObjectId = new mongoose.Types.ObjectId(payload.userId)
-    let matchQuery: any = { uploadedBy: userObjectId, isDeleted: false }
-    if (payload.role === "admin") {
-      matchQuery = { isDeleted: false }
+    let matchQuery: any = { isDeleted: false }
+    if (payload.role === "user") {
+      matchQuery.$or = [
+        { ownerId: new mongoose.Types.ObjectId(payload.userId) },
+        { ownerEmail: payload.email }
+      ]
+    } else if (payload.role === "institution") {
+      matchQuery.$or = [
+        { uploadedBy: new mongoose.Types.ObjectId(payload.userId) },
+        { issuer: { $regex: payload.email.split("@")[0], $options: "i" } }
+      ]
     }
 
     // 3. Aggregate all metrics directly from MongoDB
@@ -103,36 +109,43 @@ export async function GET(request: NextRequest) {
 
 
 
-    return NextResponse.json({
-      success: true,
-      message: "Dashboard statistics successfully aggregated",
-      data: {
-        // Flat fields - this is the shape app/dashboard/page.tsx and app/profile/page.tsx
-        // actually read (stats.totalCertificates, stats.totalViews, etc.)
-        totalCertificates,
-        verifiedCertificates,
-        pendingCertificates,
-        expiredCertificates,
-        revokedCertificates: revokedCount,
-        sharedCertificates,
-        totalViews,
-        totalDownloads,
-        storageUsed: formatFileSize(totalBytes),
-        totalBytes,
-        averageViews: totalCertificates > 0 ? Number((totalViews / totalCertificates).toFixed(2)) : 0,
-        averageDownloads: totalCertificates > 0 ? Number((totalDownloads / totalCertificates).toFixed(2)) : 0,
-        averageCertificateSize: totalCertificates > 0 ? Number((totalBytes / totalCertificates / 1024).toFixed(2)) : 0,
-        categories: categoryDistribution.map(cat => ({
-          name: cat._id,
-          count: cat.count
-        })),
-        issuers: issuerDistribution.map(issuer => ({
-          name: issuer._id,
-          count: issuer.count
-        })),
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Dashboard statistics successfully aggregated",
+        data: {
+          totalCertificates,
+          verifiedCertificates,
+          pendingCertificates,
+          expiredCertificates,
+          revokedCertificates: revokedCount,
+          sharedCertificates,
+          totalViews,
+          totalDownloads,
+          storageUsed: formatFileSize(totalBytes),
+          totalBytes,
+          averageViews: totalCertificates > 0 ? Number((totalViews / totalCertificates).toFixed(2)) : 0,
+          averageDownloads: totalCertificates > 0 ? Number((totalDownloads / totalCertificates).toFixed(2)) : 0,
+          averageCertificateSize: totalCertificates > 0 ? Number((totalBytes / totalCertificates / 1024).toFixed(2)) : 0,
+          categories: categoryDistribution.map(cat => ({
+            name: cat._id,
+            count: cat.count
+          })),
+          issuers: issuerDistribution.map(issuer => ({
+            name: issuer._id,
+            count: issuer.count
+          })),
+        },
+        timestamp: new Date().toISOString()
       },
-      timestamp: new Date().toISOString()
-    })
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
+      }
+    )
   } catch (error) {
     console.error("[DCRS API] GET dashboard stats error:", error)
     return NextResponse.json(

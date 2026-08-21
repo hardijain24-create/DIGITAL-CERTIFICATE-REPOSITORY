@@ -59,10 +59,27 @@ export default function CertificateDetailsPage() {
         setCert(data.data)
         
         // Fetch verification logs history
-        const logsRes = await fetch(`/api/verify?certificateId=${data.data._id}`)
-        const logsData = await logsRes.json()
-        if (logsData.success) {
-          setHistory(logsData.data.history || [])
+        const logsRes = await fetch(`/api/verify?certificateId=${encodeURIComponent(data.data._id)}`)
+        if (logsRes.ok) {
+          const text = await logsRes.text()
+          if (text.trim()) {
+            try {
+              const logsData = JSON.parse(text)
+              if (logsData.success) {
+                setHistory(logsData.data?.history || logsData.history || [])
+              } else {
+                setHistory([])
+              }
+            } catch (error) {
+              console.error("Failed to parse verification history:", error)
+              setHistory([])
+            }
+          } else {
+            setHistory([])
+          }
+        } else {
+          console.warn("Verification history request failed:", logsRes.status)
+          setHistory([])
         }
       } else {
         toast.error(data.message || "Failed to load certificate details.")

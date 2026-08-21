@@ -197,11 +197,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ success: false, message: "Forbidden: You are not authorized to delete this certificate" }, { status: 403 })
     }
 
-    // 4. Soft delete: Mark as deleted instead of removing from database
-    cert.isDeleted = true
-    cert.deletedAt = new Date()
-    cert.deletedBy = new Types.ObjectId(payload.userId)
-    await cert.save()
+    // 4. Hard delete: Remove record from database
+    await Certificate.deleteOne({ _id: cert._id })
 
     // 5. Remove file asset from Cloudinary (actual storage cleanup)
     if (cert.publicId) {

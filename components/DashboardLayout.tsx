@@ -40,12 +40,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const commandPaletteRef = useRef<HTMLDivElement>(null)
 
-  // System Notifications Mock
-  const notifications = [
-    { id: 1, title: "New Certificate Uploaded", desc: "AWS Certified Architect certificate was added.", time: "10 mins ago" },
-    { id: 2, title: "Verification Checked", desc: "Academic degree verified successfully by a guest.", time: "2 hours ago" },
-    { id: 3, title: "Share Link Generated", desc: "Shared Physics Certificate with Prof. Smith.", time: "1 day ago" }
-  ]
+  // System Notifications State
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: "New Certificate Uploaded", desc: "AWS Certified Architect certificate was added.", time: "10 mins ago", read: false },
+    { id: 2, title: "Verification Checked", desc: "Academic degree verified successfully by a guest.", time: "2 hours ago", read: false },
+    { id: 3, title: "Share Link Generated", desc: "Shared Physics Certificate with Prof. Smith.", time: "1 day ago", read: false }
+  ])
+
+  const hasUnreadNotifications = notifications.some(n => !n.read)
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    toast.success("All notifications marked as read.")
+  }
 
   // Sidebar Links
   const links = [
@@ -58,25 +65,37 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Read User details on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("user")
-      if (stored) {
-        setUser(JSON.parse(stored))
-      } else {
-        // Fallback dummy user if not found (middleware handles redirect)
-        setUser({ name: "John Doe", email: "student@dcrs.io", role: "user" })
+    const loadUser = async () => {
+      try {
+        const stored = localStorage.getItem("user")
+        if (stored) {
+          setUser(JSON.parse(stored))
+        } else {
+          const res = await fetch("/api/auth/profile")
+          if (res.ok) {
+            const data = await res.json()
+            if (data.success && data.data) {
+              setUser(data.data)
+              localStorage.setItem("user", JSON.stringify(data.data))
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error loading user details", e)
       }
-    } catch (e) {
-      console.error("Error reading user details", e)
     }
+    loadUser()
   }, [])
 
-  // Listen for Ctrl+K command shortcut
+  // Listen for Ctrl+K command shortcut and Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault()
         setIsCommandPaletteOpen((prev) => !prev)
+      }
+      if (e.key === "Escape") {
+        setIsCommandPaletteOpen(false)
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -269,7 +288,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <Bell className="w-5 h-5 text-muted-foreground" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-white"></span>
+                {hasUnreadNotifications && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-white"></span>
+                )}
               </button>
 
               {/* Notifications Dropdown */}
@@ -283,11 +304,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <div className="flex items-center justify-between pb-3 border-b border-border">
                       <span className="font-bold text-sm">Notifications</span>
-                      <button className="text-xs text-primary hover:underline font-semibold">Mark all read</button>
+                      <button 
+                        onClick={handleMarkAllRead} 
+                        className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
                     </div>
                     <div className="space-y-3 mt-3 max-h-60 overflow-y-auto">
                       {notifications.map((notif) => (
-                        <div key={notif.id} className="text-left py-1 pb-2 border-b border-border/40 last:border-0">
+                        <div key={notif.id} className={`text-left py-1 pb-2 border-b border-border/40 last:border-0 transition-colors ${!notif.read ? "bg-primary/5 px-2.5 py-1 rounded-xl" : ""}`}>
                           <p className="text-xs font-bold text-foreground leading-4">{notif.title}</p>
                           <p className="text-[11px] text-muted-foreground mt-0.5 leading-3.5">{notif.desc}</p>
                           <span className="text-[9px] text-muted-foreground/60 font-semibold block mt-1">{notif.time}</span>
@@ -508,22 +534,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div>
                   <h3 className="text-[10px] text-muted-foreground uppercase font-bold px-2.5 mb-1.5">Navigation</h3>
                   <div className="space-y-0.5">
-                    {[
-                      { name: "Go to Dashboard", href: "/dashboard", icon: LayoutDashboard },
-                      { name: "View Certificates", href: "/certificates", icon: FileText },
-                      { name: "Upload Certificate", href: "/upload", icon: Upload },
-                      { name: "Verify Certificates", href: "/verify", icon: ShieldCheck },
-                      { name: "View Profile", href: "/profile", icon: User },
-                    ].map((item) => (
-                      <button
-                        key={item.name}
-                        onClick={() => handleCommandNavigate(item.href)}
-                        className="w-full flex items-center gap-3 px-2.5 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors text-left"
-                      >
-                        <item.icon className="w-4 h-4 text-primary" />
-                        <span>{item.name}</span>
-                      </button>
-                    ))}
+                    {(() => {
+                      const filtered = [
+                        { name: "Go to Dashboard", href: "/dashboard", icon: LayoutDashboard },
+                        { name: "View Certificates", href: "/certificates", icon: FileText },
+                        { name: "Upload Certificate", href: "/upload", icon: Upload },
+                        { name: "Verify Certificates", href: "/verify", icon: ShieldCheck },
+                        { name: "View Profile", href: "/profile", icon: User },
+                        ...(user?.role === "admin" ? [{ name: "Admin Panel", href: "/admin", icon: ShieldAlert }] : []),
+                      ].filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+
+                      if (filtered.length === 0) {
+                        return <p className="text-xs text-muted-foreground px-2.5 py-2">No matching commands found.</p>
+                      }
+
+                      return filtered.map((item) => (
+                        <button
+                          key={item.name}
+                          onClick={() => handleCommandNavigate(item.href)}
+                          className="w-full flex items-center gap-3 px-2.5 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-colors text-left cursor-pointer"
+                        >
+                          <item.icon className="w-4 h-4 text-primary" />
+                          <span>{item.name}</span>
+                        </button>
+                      ))
+                    })()}
                   </div>
                 </div>
 

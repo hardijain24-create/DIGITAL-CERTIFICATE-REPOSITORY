@@ -14,15 +14,20 @@ export async function POST(request: NextRequest) {
     
     // Log logout if token exists and is valid
     if (token) {
-      const JWT_SECRET = getJWTSecret()
-      const payload = await verifyJWT(token, JWT_SECRET)
-      if (payload) {
-        await connectDB()
-        await ActivityLog.create({
-          userId: payload.userId,
-          action: "user_logout",
-          description: `User logged out: ${payload.email}`,
-        })
+      try {
+        const JWT_SECRET = getJWTSecret()
+        const payload = await verifyJWT(token, JWT_SECRET)
+        if (payload) {
+          await connectDB()
+          await ActivityLog.create({
+            userId: payload.userId,
+            action: "user_logout",
+            description: `User logged out: ${payload.email}`,
+          })
+        }
+      } catch (logError) {
+        console.error("[DCRS API] Failed to log user logout activity:", logError)
+        // Continue logout flow even if logging fails
       }
     }
 

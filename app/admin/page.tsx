@@ -408,7 +408,7 @@ export default function AdminDashboardPage() {
                   <tbody>
                     {filteredAudit.length > 0 ? (
                       filteredAudit.map((item) => (
-                        <tr key={item._id} className="border-b border-border/40 hover:bg-slate-50/50 transition-colors font-medium">
+                        <tr key={item.id} className="border-b border-border/40 hover:bg-slate-50/50 transition-colors font-medium">
                           <td className="p-4 pl-6 text-muted-foreground whitespace-nowrap">
                             {new Date(item.timestamp).toLocaleString()}
                           </td>

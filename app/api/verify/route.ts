@@ -217,11 +217,88 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error("[DCRS API] POST verification handler error:", error)
+    console.log("[DCRS API] POST verification handler error:", error)
     return NextResponse.json(
       {
         success: false,
         message: "Verification failed",
+        error: error instanceof Error ? error.message : "Internal Server Error"
+      },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * GET /api/verify
+ * Retrieve verification history logs for a certificate
+ */
+export async function GET(request: NextRequest) {
+  try {
+    await connectDB()
+    
+    const { searchParams } = new URL(request.url)
+    const certificateId = searchParams.get("certificateId")
+    
+    if (!certificateId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Missing certificateId query parameter.",
+          data: { history: [] },
+          history: []
+        },
+        { status: 400 }
+      )
+    }
+    
+    const queryCond: any = {}
+    const { default: mongoose } = await import("mongoose")
+    if (mongoose.Types.ObjectId.isValid(certificateId)) {
+      queryCond.certificateId = new mongoose.Types.ObjectId(certificateId)
+    } else {
+      // If it's a certificateId string, lookup the certificate first to find its ObjectId
+      const cert = await Certificate.findOne({ certificateId, isDeleted: false })
+      if (cert) {
+        queryCond.certificateId = cert._id
+      } else {
+        return NextResponse.json({
+          success: true,
+          data: { history: [] },
+          history: []
+        })
+      }
+    }
+    
+    const logs = await VerificationLog.find(queryCond)
+      .sort({ createdAt: -1 })
+      .lean()
+      
+    // Transform logs to serialize dates and IDs consistently
+    const serializedLogs = logs.map((log: any) => ({
+      id: log._id.toString(),
+      verifiedAt: log.createdAt ? log.createdAt.toISOString() : new Date().toISOString(),
+      verifiedByName: log.verifiedByName || "Guest Auditor",
+      verificationMethod: log.verificationMethod || "certificate_id",
+      status: log.status || "verified",
+      ipAddress: log.ipAddress || "127.0.0.1",
+    }))
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        history: serializedLogs
+      },
+      history: serializedLogs
+    })
+  } catch (error) {
+    console.error("[DCRS API] GET verification history error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to fetch verification history",
+        data: { history: [] },
+        history: [],
         error: error instanceof Error ? error.message : "Internal Server Error"
       },
       { status: 500 }

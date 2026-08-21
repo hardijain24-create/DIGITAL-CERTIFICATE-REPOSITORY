@@ -121,9 +121,9 @@ function VerifyPageContent() {
       const data = await response.json()
       
       setResult({
-        status: data.data.status,
+        status: data.status,
         message: data.message,
-        certificate: data.data.certificate
+        certificate: data.data?.certificate
       })
 
       if (data.success) {
@@ -161,9 +161,9 @@ function VerifyPageContent() {
       const data = await response.json()
 
       setResult({
-        status: data.data.status,
+        status: data.status,
         message: data.message,
-        certificate: data.data.certificate
+        certificate: data.data?.certificate
       })
 
       if (data.success) {

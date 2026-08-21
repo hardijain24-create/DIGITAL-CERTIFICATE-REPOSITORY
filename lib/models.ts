@@ -215,6 +215,7 @@ export interface IActivityLog extends Document {
   userId: mongoose.Types.ObjectId
   action:
     | "user_login"
+    | "user_logout"
     | "user_register"
     | "certificate_uploaded"
     | "certificate_downloaded"
@@ -256,6 +257,7 @@ const ActivityLogSchema = new Schema<IActivityLog>({
     type: String,
     enum: [
       "user_login",
+      "user_logout",
       "user_register",
       "certificate_uploaded",
       "certificate_downloaded",

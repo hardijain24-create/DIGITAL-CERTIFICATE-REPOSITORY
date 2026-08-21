@@ -1,3 +1,13 @@
+import dns from "dns"
+
+// Configure DNS resolution process-wide for MongoDB Atlas SRV records
+try {
+  dns.setServers(["8.8.8.8", "8.8.4.4"])
+  console.log("🍃 Next.js parent process DNS configured to Google Public DNS")
+} catch (dnsErr) {
+  console.warn("⚠️ DNS configuration warning in next.config.mjs:", dnsErr)
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -64,10 +74,6 @@ const nextConfig = {
 
   // Production optimizations
   productionBrowserSourceMaps: false,
-  optimizeFonts: true,
-  
-  // Swcminify is the default in Next.js 16
-  swcMinify: true,
   
   // Turbopack configuration
   experimental: {

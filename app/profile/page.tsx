@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import DashboardLayout from "@/components/DashboardLayout"
-import { updateProfile } from "@/app/actions/profile"
+import { updateProfile, changePassword } from "@/app/actions/profile"
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{ name: string; email: string; role: string; profilePicture?: string } | null>(null)
@@ -26,6 +26,13 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<any>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Password fields
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isPasswordUpdating, setIsPasswordUpdating] = useState(false)
 
   // Fetch profile settings and statistics
   useEffect(() => {
@@ -80,6 +87,42 @@ export default function ProfilePage() {
       toast.error("Error saving profile details.")
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  // Handle password change submit
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("All password fields are required.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirm password do not match.")
+      return
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters long.")
+      return
+    }
+
+    try {
+      setIsPasswordUpdating(true)
+      const res = await changePassword({ currentPassword, newPassword, confirmPassword })
+
+      if (res.success) {
+        toast.success("Password changed successfully.")
+        setCurrentPassword("")
+        setNewPassword("")
+        setConfirmPassword("")
+        setIsChangingPassword(false)
+      } else {
+        toast.error(res.error || "Failed to change password.")
+      }
+    } catch (err) {
+      toast.error("Error changing password.")
+    } finally {
+      setIsPasswordUpdating(false)
     }
   }
 
@@ -167,13 +210,67 @@ export default function ProfilePage() {
                       <p className="font-bold text-foreground">Password Details</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Secure password configured with bcryptjs encryption.</p>
                     </div>
-                    <button
-                      onClick={() => toast.info("Password updates should be requested via system admin.")}
-                      className="border border-border hover:bg-muted text-foreground px-4 py-1.5 rounded-xl font-bold text-[10px] cursor-pointer"
-                    >
-                      Update Password
-                    </button>
+                    {!isChangingPassword ? (
+                      <button
+                        onClick={() => setIsChangingPassword(true)}
+                        className="border border-border hover:bg-muted text-foreground px-4 py-1.5 rounded-xl font-bold text-[10px] cursor-pointer"
+                      >
+                        Update Password
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setIsChangingPassword(false)}
+                        className="border border-border hover:bg-muted text-foreground px-4 py-1.5 rounded-xl font-bold text-[10px] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
+
+                  {isChangingPassword && (
+                    <form onSubmit={handleChangePassword} className="space-y-3 pt-3 border-t border-border/40 text-left">
+                      <div>
+                        <label className="block text-[10px] font-bold text-foreground mb-1 uppercase tracking-wider">Current Password</label>
+                        <input
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full bg-white/60 border border-border/85 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary"
+                          required
+                          disabled={isPasswordUpdating}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-foreground mb-1 uppercase tracking-wider">New Password</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-white/60 border border-border/85 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary"
+                          required
+                          disabled={isPasswordUpdating}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-foreground mb-1 uppercase tracking-wider">Confirm New Password</label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full bg-white/60 border border-border/85 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary"
+                          required
+                          disabled={isPasswordUpdating}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isPasswordUpdating}
+                        className="bg-primary hover:bg-secondary text-white font-bold px-4 py-2 rounded-xl text-[10px] transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {isPasswordUpdating ? "Updating..." : "Save New Password"}
+                      </button>
+                    </form>
+                  )}
 
                   <div className="flex justify-between items-center text-xs pt-3 border-t border-border/40">
                     <div>
