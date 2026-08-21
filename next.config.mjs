@@ -1,11 +1,13 @@
 import dns from "dns"
 
-// Configure DNS resolution process-wide for MongoDB Atlas SRV records
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4"])
-  console.log("🍃 Next.js parent process DNS configured to Google Public DNS")
-} catch (dnsErr) {
-  console.warn("⚠️ DNS configuration warning in next.config.mjs:", dnsErr)
+// Configure DNS resolution process-wide for MongoDB Atlas SRV records in local environments
+if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+  try {
+    dns.setServers(["8.8.8.8", "8.8.4.4"])
+    console.log("🍃 Next.js parent process DNS configured to Google Public DNS")
+  } catch (dnsErr) {
+    console.warn("⚠️ DNS configuration warning in next.config.mjs:", dnsErr)
+  }
 }
 
 /** @type {import('next').NextConfig} */

@@ -2,11 +2,13 @@ import mongoose from "mongoose"
 import { getMongoDBURI } from "./env"
 import dns from "dns"
 
-// Configure DNS resolution for MongoDB Atlas SRV records
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4"])
-} catch (dnsErr) {
-  console.warn("⚠️ DNS configuration warning: could not set custom resolvers", dnsErr)
+// Configure DNS resolution for MongoDB Atlas SRV records in local environments
+if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+  try {
+    dns.setServers(["8.8.8.8", "8.8.4.4"])
+  } catch (dnsErr) {
+    console.warn("⚠️ DNS configuration warning: could not set custom resolvers", dnsErr)
+  }
 }
 
 let MONGODB_URI: string
